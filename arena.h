@@ -7,12 +7,15 @@
 #define BLOCK_CAN_ALLOC(block_ptr, bytes) (block_ptr != NULL && block_ptr->size + bytes < block_ptr->capacity)
 
 #ifdef _WIN32
-#include <windows.h>
+#include <heapapi.h>
 
-#define malloc(size) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
-#define free(ptr) HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, ptr);
+#define platform_alloc(size) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+#define platform_free(ptr) HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, ptr);
 #else
 #include <stdlib.h>
+
+#define platform_alloc(size) malloc(size)
+#define platform_free(ptr) free(ptr)
 #endif
 
 typedef struct _block {
@@ -39,7 +42,7 @@ void* arena_alloc(Arena* a, size_t bytes) {
   // new block
   if (a->current == NULL || !BLOCK_CAN_ALLOC(a->current, bytes)) {
     Block *prev = a->current; 
-    a->current = malloc(sizeof(Block));
+    a->current = platform_alloc(sizeof(Block));
 
 #if defined(ZERO_MEM) && !defined(_WIN32) // windows defaults to HEAP_ZERO_MEMORY
     memset(a->current, 0, sizeof(Block));
@@ -70,7 +73,7 @@ void arena_free(Arena *a) {
 
   for (tmp = a->head; tmp != NULL; tmp = next) {
     next = tmp->next;
-    free(tmp);
+    platform_free(tmp);
   }
 
   a->head = NULL;
