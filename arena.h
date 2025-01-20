@@ -27,7 +27,8 @@ typedef struct {
   Block *current;
 } Arena;
 
-void* arena_alloc(Arena* a, size_t bytes);
+void* arena_alloc(Arena*, size_t);
+void arena_free(Arena*);
 
 #ifdef ARENA_IMPLEMENTATION
 
