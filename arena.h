@@ -9,13 +9,15 @@
 #ifdef _WIN32
 #include <heapapi.h>
 
-#define platform_alloc(size) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
-#define platform_free(ptr) HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, ptr);
+#define platform_alloc(size) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size)
+#define platform_free(ptr) HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, ptr)
+#define platform_memcopy(dest, src, size) CopyMemory(dest, src, size)
 #else
 #include <stdlib.h>
 
 #define platform_alloc(size) malloc(size)
 #define platform_free(ptr) free(ptr)
+#define platform_memcopy(dest, src, size) memcpy(dest, src, size)
 #endif
 
 typedef struct _block {
@@ -32,6 +34,7 @@ typedef struct {
 
 void* arena_alloc(Arena*, size_t);
 void arena_free(Arena*);
+char* arena_strdup(Arena*, const char*);
 
 #ifdef ARENA_IMPLEMENTATION
 
@@ -78,6 +81,16 @@ void arena_free(Arena *a) {
 
   a->head = NULL;
   a->current = NULL;
+}
+
+char* arena_strdup(Arena* a, const char* str) {
+  size_t len = strlen(str) + 1;
+  char* copy = (char*)arena_alloc(a, len);
+  if (!copy) return NULL;
+
+  platform_memcopy(copy, str, len);
+  
+  return copy;
 }
 
 
