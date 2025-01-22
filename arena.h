@@ -60,11 +60,11 @@ void* arena_alloc(Arena* a, size_t bytes) {
       prev->next = a->current;
   }
 
-  size_t begin = a->current->size;
+  size_t free_idx = a->current->size;
 
   a->current->size += bytes;
   
-  return (void*)(a->current + begin);
+  return (void*)(a->current->data + free_idx);
 }
 
 void arena_free(Arena *a) {
