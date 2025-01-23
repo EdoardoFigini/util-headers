@@ -30,6 +30,7 @@ typedef struct _block {
 typedef struct {
   Block *head;
   Block *current;
+  size_t block_count;
 } Arena;
 
 void* arena_alloc(Arena*, size_t);
@@ -58,6 +59,8 @@ void* arena_alloc(Arena* a, size_t bytes) {
       a->head = a->current;
     else
       prev->next = a->current;
+
+    a->block_count++;
   }
 
   size_t free_idx = a->current->size;
@@ -81,6 +84,7 @@ void arena_free(Arena *a) {
 
   a->head = NULL;
   a->current = NULL;
+  a->block_count = 0;
 }
 
 char* arena_strdup(Arena* a, const char* str) {
