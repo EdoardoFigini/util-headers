@@ -6,6 +6,8 @@
 int main(void) {
   sb_t file_data = { 0 };
 
+  LOG_INFO("Reading file `%s`", __FILE__);
+
   if (sb_read_file(__FILE__, &file_data) < 0) {
     LOG_ERROR("sb_read_file failed");
     return 1;
