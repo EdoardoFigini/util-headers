@@ -7,7 +7,8 @@
 #define BLOCK_CAN_ALLOC(block_ptr, bytes) (block_ptr != NULL && block_ptr->size + bytes < block_ptr->capacity)
 
 #ifdef _WIN32
-#include <heapapi.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 #define platform_alloc(size) HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size)
 #define platform_free(ptr) HeapFree(GetProcessHeap(), HEAP_NO_SERIALIZE, ptr)
@@ -20,36 +21,38 @@
 #define platform_memcopy(dest, src, size) memcpy(dest, src, size)
 #endif
 
+#include <stdarg.h>
+
 typedef struct _block {
   unsigned char data[DEFAULT_BLOCK_SIZE];
   size_t size;
   size_t capacity;
   struct _block *next;
-} Block;
+} block_t;
 
 typedef struct {
-  Block *head;
-  Block *current;
+  block_t *head;
+  block_t *current;
   size_t block_count;
-} Arena;
+} arena_t;
 
-void* arena_alloc(Arena*, size_t);
-void arena_free(Arena*);
-char* arena_strdup(Arena*, const char*);
+void* arena_alloc(arena_t*, size_t);
+void arena_free(arena_t*);
+char* arena_strdup(arena_t*, const char*);
 
 #ifdef ARENA_IMPLEMENTATION
 
-void* arena_alloc(Arena* a, size_t bytes) {
+void* arena_alloc(arena_t* a, size_t bytes) {
   if (!a) return NULL;
   if (bytes > DEFAULT_BLOCK_SIZE) return NULL; 
 
   // new block
   if (a->current == NULL || !BLOCK_CAN_ALLOC(a->current, bytes)) {
-    Block *prev = a->current; 
-    a->current = platform_alloc(sizeof(Block));
+    block_t *prev = a->current; 
+    a->current = platform_alloc(sizeof(block_t));
 
 #if defined(ZERO_MEM) && !defined(_WIN32) // windows defaults to HEAP_ZERO_MEMORY
-    memset(a->current, 0, sizeof(Block));
+    memset(a->current, 0, sizeof(block_t));
 #endif
 
     a->current->size = 0;
@@ -70,12 +73,12 @@ void* arena_alloc(Arena* a, size_t bytes) {
   return (void*)(a->current->data + free_idx);
 }
 
-void arena_free(Arena *a) {
+void arena_free(arena_t *a) {
   if (!a) return;
   if (a->head == NULL) return;
 
-  Block* tmp;
-  Block* next;
+  block_t* tmp;
+  block_t* next;
 
   for (tmp = a->head; tmp != NULL; tmp = next) {
     next = tmp->next;
@@ -87,7 +90,7 @@ void arena_free(Arena *a) {
   a->block_count = 0;
 }
 
-char* arena_strdup(Arena* a, const char* str) {
+char* arena_strdup(arena_t* a, const char* str) {
   size_t len = strlen(str) + 1;
   char* copy = (char*)arena_alloc(a, len);
   if (!copy) return NULL;
@@ -97,6 +100,31 @@ char* arena_strdup(Arena* a, const char* str) {
   return copy;
 }
 
+char* arena_sprintf(arena_t* a, const char* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+
+  va_list args_copy;
+  va_copy(args_copy, args);
+  int len = vsnprintf(NULL, 0, fmt, args_copy);
+  va_end(args_copy);
+
+  if (len < 0) {
+    va_end(args);
+    return NULL;
+  }
+
+  char* buffer = (char*)arena_alloc(a, (size_t)len + 1);
+  if (!buffer) {
+    va_end(args);
+    return NULL;
+  }
+
+  vsnprintf(buffer, len + 1, fmt, args);
+  va_end(args);
+
+  return buffer;
+}
 
 #endif // !ARENA_IMPLEMENTATION
 #endif // !ARENA_H
